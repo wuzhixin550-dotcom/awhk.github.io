@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>唐代三省制運作模擬器 - 高清版</title>
+    <!-- 使用 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: #f3e9d2;
+            overflow-x: hidden;
+        }
+
+        .scroll-container {
+            background-color: #fffcf5;
+            border: 10px solid #8b4513;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+
+        .dept-card {
+            transition: all 0.5s ease;
+        }
+
+        .active-glow-blue {
+            background-color: #dbeafe !important;
+            border-color: #1d4ed8 !important;
+            box-shadow: 0 0 30px rgba(29, 78, 216, 0.4);
+            transform: scale(1.05);
+        }
+
+        .active-glow-green {
+            background-color: #dcfce7 !important;
+            border-color: #16a34a !important;
+            box-shadow: 0 0 40px rgba(22, 163, 74, 0.5);
+            transform: scale(1.2);
+        }
+
+        .active-glow-red {
+            background-color: #fee2e2 !important;
+            border-color: #dc2626 !important;
+            box-shadow: 0 0 30px rgba(220, 38, 38, 0.4);
+            transform: scale(1.05);
+        }
+
+        .active-glow-orange {
+            background-color: #ffedd5 !important;
+            border-color: #ea580c !important;
+            box-shadow: 0 0 30px rgba(234, 88, 12, 0.4);
+            transform: scale(1.05);
+        }
+
+        .hidden-element {
+            display: none !important;
+        }
+
+        @keyframes pulse-custom {
+            0% { transform: scale(1.2); }
+            50% { transform: scale(1.25); }
+            100% { transform: scale(1.2); }
+        }
+
+        .anim-pulse {
+            animation: pulse-custom 2s infinite;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center min-h-screen">
+
+    <div class="max-w-6xl w-full scroll-container p-8 md:p-12 rounded-lg relative">
+        
+        <!-- 標題區域 -->
+        <div class="text-center mb-12 border-b-4 border-double border-[#8b4513] pb-8">
+            <h1 class="text-6xl md:text-7xl font-black text-[#5d2e0a] mb-4 tracking-tighter">唐代三省制運作模擬</h1>
+            <p class="text-3xl text-[#8b4513] font-bold">三省制衡 ・ 政事堂共同決策</p>
+        </div>
+
+        <!-- 初始發布按鈕 -->
+        <div id="start-overlay" class="absolute inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-[2px] rounded-lg">
+            <button onclick="startSimulation()" class="bg-[#8b4513] text-[#fffcf5] text-5xl font-black py-10 px-20 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all">
+                📜 皇帝發布政令
+            </button>
+        </div>
+
+        <!-- 主要流程圖 -->
+        <div class="flex flex-col gap-16 relative">
+            
+            <!-- 第一層：皇帝 -->
+            <div class="flex justify-center">
+                <div id="dept-emperor" class="p-8 rounded-3xl border-4 border-gray-200 bg-white flex flex-col items-center w-72 transition-all duration-500">
+                    <span class="text-8xl mb-2">👑</span>
+                    <span class="text-5xl font-black text-yellow-900">皇帝</span>
+                </div>
+            </div>
+
+            <!-- 第二層：三省與政事堂 -->
+            <div class="grid grid-cols-3 gap-4 items-center">
+                
+                <!-- 中書省 -->
+                <div id="dept-zhongshu" class="dept-card p-8 rounded-2xl border-4 border-gray-200 bg-white text-center opacity-40">
+                    <span class="text-6xl block mb-4">✍️</span>
+                    <div class="text-5xl font-black text-blue-900">中書省</div>
+                    <div class="text-2xl font-bold text-blue-700 mt-3">「草擬」政令</div>
+                </div>
+
+                <!-- 政事堂 (核心) -->
+                <div id="dept-hall" class="dept-card p-10 rounded-full border-8 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center aspect-square opacity-20 mx-auto w-64 md:w-80">
+                    <span class="text-6xl block mb-2">🤝</span>
+                    <div class="text-4xl font-black text-emerald-900">政事堂</div>
+                    <div class="text-xl font-bold text-emerald-700 mt-2 text-center">三省長官<br>共同商議</div>
+                </div>
+
+                <!-- 門下省 -->
+                <div id="dept-menxia" class="dept-card p-8 rounded-2xl border-4 border-gray-200 bg-white text-center opacity-40 relative">
+                    <div id="reject-label" class="hidden-element absolute -top-16 inset-x-0 flex justify-center">
+                        <span class="bg-red-600 text-white text-3xl font-bold px-8 py-3 rounded-full animate-bounce">封駁中！</span>
+                    </div>
+                    <span class="text-6xl block mb-4">🛡️</span>
+                    <div class="text-5xl font-black text-red-900">門下省</div>
+                    <div class="text-2xl font-bold text-red-700 mt-3">「審核」封駁</div>
+                </div>
+            </div>
+
+            <!-- 決策對話框 (政事堂商議時顯示) -->
+            <div id="decision-box" class="hidden-element bg-[#fff9e6] p-12 border-8 border-emerald-500 rounded-3xl shadow-2xl animate-bounce-in">
+                <div class="text-center">
+                    <h3 class="text-4xl font-black text-emerald-900 mb-6 italic">📜 正在政事堂討論的議案：</h3>
+                    <p id="scenario-content" class="text-5xl font-bold text-slate-800 mb-6 leading-tight"></p>
+                    <p id="scenario-impact" class="text-2xl text-slate-600 mb-10 font-bold"></p>
+                    <div class="flex gap-12 justify-center">
+                        <button onclick="approve()" class="bg-emerald-600 text-white text-5xl font-bold py-8 px-16 rounded-2xl hover:bg-emerald-700 hover:scale-105 transition shadow-xl flex items-center gap-4">
+                            <span>✅ 通過</span>
+                        </button>
+                        <button onclick="reject()" class="bg-red-600 text-white text-5xl font-bold py-8 px-16 rounded-2xl hover:bg-red-700 hover:scale-105 transition shadow-xl flex items-center gap-4">
+                            <span>❌ 封駁</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 第三層：執行單位 -->
+            <div class="flex flex-col items-center">
+                <div id="dept-shangshu" class="p-10 rounded-3xl border-4 border-gray-200 bg-white text-center w-full transition-all duration-700 opacity-20">
+                    <span class="text-6xl block mb-4">📜</span>
+                    <div class="text-6xl font-black text-orange-900 mb-8">尚書省 (執行政策)</div>
+                    
+                    <!-- 六部 -->
+                    <div class="grid grid-cols-6 gap-4">
+                        <div class="board-item text-4xl font-black p-8 rounded-xl border-4 bg-gray-100 border-gray-300 text-gray-400">吏部</div>
+                        <div class="board-item text-4xl font-black p-8 rounded-xl border-4 bg-gray-100 border-gray-300 text-gray-400">戶部</div>
+                        <div class="board-item text-4xl font-black p-8 rounded-xl border-4 bg-gray-100 border-gray-300 text-gray-400">禮部</div>
+                        <div class="board-item text-4xl font-black p-8 rounded-xl border-4 bg-gray-100 border-gray-300 text-gray-400">兵部</div>
+                        <div class="board-item text-4xl font-black p-8 rounded-xl border-4 bg-gray-100 border-gray-300 text-gray-400">刑部</div>
+                        <div class="board-item text-4xl font-black p-8 rounded-xl border-4 bg-gray-100 border-gray-300 text-gray-400">工部</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系統日誌 -->
+        <div class="mt-12 bg-slate-900 border-4 border-slate-700 p-8 rounded-2xl shadow-inner h-48 overflow-hidden">
+            <div id="log-content" class="flex flex-col gap-3">
+                <!-- 日誌內容動態插入 -->
+            </div>
+        </div>
+
+        <!-- 重置按鈕 -->
+        <button onclick="reset()" class="absolute top-8 right-8 text-gray-400 hover:text-red-500 transition-all hover:rotate-180">
+            <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg>
+        </button>
+    </div>
+
+    <!-- 教學提示欄 -->
+    <div class="mt-10 text-center bg-white/90 p-8 rounded-2xl border-4 border-[#8b4513] max-w-5xl shadow-xl">
+        <p class="text-4xl font-black text-[#8b4513] mb-4">💡 中一級歷史知識點</p>
+        <div class="text-3xl font-bold text-slate-700 leading-relaxed text-left px-8">
+            <span class="text-blue-700">1. 中書省</span>：負責「草擬」計畫（即起草詔令）<br>
+            <span class="text-red-700">2. 門下省</span>：負責「審核」，如覺不當可「封駁」（退回）<br>
+            <span class="text-orange-700">3. 尚書省</span>：帶領六部負責「執行」<br>
+            <span class="text-emerald-700 italic underline">● 政事堂</span>：設於門下省，供三省長官共同議政，減少延誤。
+        </div>
+    </div>
+
+    <script>
+        const scenarios = [
+            {
+                title: "軍事：突厥南下入侵",
+                content: "立即在關中地區強行徵召十萬農民配兵北上。",
+                impact: "後果：軍事力大幅提升，但春耕荒廢將引發大饑荒。",
+                reject: "門下省：民為邦本，春耕不可廢！強行徵兵必亂，予以封駁！"
+            },
+            {
+                title: "建設：修繕黃河堤壩",
+                content: "撥款五十萬貫資產，招募專業工匠加固下游大堤。",
+                impact: "後果：北方安定度提升，減少夏季洪災風險。",
+                reject: "門下省：此乃德政，唯預算分配需再細議，准予通過！"
+            },
+            {
+                title: "財政：增設民間茶稅",
+                content: "對民間茶葉交易加徵三成稅收以充實國庫。",
+                impact: "後果：國庫收入增加，但會造成商賈罷市，民心下降。",
+                reject: "門下省：稅收過重無異於殺雞取卵，應降為一成。退回重擬！"
+            }
+        ];
+
+        let currentScenario = null;
+        let timeoutIds = []; // 追蹤所有的 timeout 以防重置時出現混亂
+
+        function clearAllTimeouts() {
+            timeoutIds.forEach(id => clearTimeout(id));
+            timeoutIds = [];
+        }
+
+        function addLog(msg, colorClass = "text-green-400") {
+            const logContent = document.getElementById('log-content');
+            const entry = document.createElement('div');
+            entry.className = `text-3xl font-bold ${colorClass}`;
+            entry.innerText = `▶ ${msg}`;
+            logContent.prepend(entry);
+        }
+
+        function startSimulation() {
+            document.getElementById('start-overlay').classList.add('hidden-element');
+            currentScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+            
+            // 皇帝激活
+            document.getElementById('dept-emperor').classList.add('bg-yellow-100', 'border-yellow-600', 'shadow-xl');
+            addLog(`皇帝下旨：${currentScenario.title}`, "text-yellow-500");
+
+            timeoutIds.push(setTimeout(() => {
+                // 中書省激活
+                document.getElementById('dept-zhongshu').classList.remove('opacity-40');
+                document.getElementById('dept-zhongshu').classList.add('active-glow-blue');
+                addLog("中書省正在草擬詔令文本...");
+                
+                timeoutIds.push(setTimeout(() => {
+                    // 進入政事堂
+                    document.getElementById('dept-hall').classList.remove('opacity-20');
+                    document.getElementById('dept-hall').classList.add('active-glow-green', 'anim-pulse');
+                    document.getElementById('dept-menxia').classList.remove('opacity-40');
+                    document.getElementById('dept-menxia').classList.add('active-glow-red');
+                    
+                    document.getElementById('scenario-content').innerText = currentScenario.content;
+                    document.getElementById('scenario-impact').innerText = currentScenario.impact;
+                    document.getElementById('decision-box').classList.remove('hidden-element');
+                    
+                    addLog("三省長官進入政事堂會議，請進行決策。");
+                }, 1500));
+            }, 1000));
+        }
+
+        function approve() {
+            document.getElementById('decision-box').classList.add('hidden-element');
+            document.getElementById('dept-hall').classList.remove('anim-pulse');
+            addLog("門下省審查通過！送交尚書省。");
+            
+            timeoutIds.push(setTimeout(() => {
+                document.getElementById('dept-shangshu').classList.remove('opacity-20');
+                document.getElementById('dept-shangshu').classList.add('active-glow-orange');
+                
+                const boards = document.querySelectorAll('.board-item');
+                boards.forEach((b, index) => {
+                    timeoutIds.push(setTimeout(() => {
+                        b.classList.remove('bg-gray-100', 'border-gray-300', 'text-gray-400');
+                        b.classList.add('bg-orange-500', 'border-orange-800', 'text-white', 'scale-110');
+                    }, index * 200));
+                });
+                addLog("尚書省下達六部，政策正式執行！", "text-orange-400");
+                
+                // 執行完畢後自動重置 (修復卡住的問題)
+                timeoutIds.push(setTimeout(() => {
+                    reset();
+                    addLog("政令已落實，模擬結束。請下達新指令。", "text-gray-400");
+                }, 5000));
+            }, 1000));
+        }
+
+        function reject() {
+            document.getElementById('decision-box').classList.add('hidden-element');
+            document.getElementById('reject-label').classList.remove('hidden-element');
+            addLog(`🚨 封駁成功：${currentScenario.reject}`, "text-red-500");
+
+            timeoutIds.push(setTimeout(() => {
+                reset();
+                addLog("政令已被退回，模擬結束。請下達新指令。", "text-gray-400");
+            }, 4000));
+        }
+
+        function reset() {
+            clearAllTimeouts(); // 清除所有排程，防止畫面混亂
+            
+            // 恢復所有初始狀態
+            document.getElementById('start-overlay').classList.remove('hidden-element');
+            document.getElementById('decision-box').classList.add('hidden-element');
+            document.getElementById('reject-label').classList.add('hidden-element');
+            
+            const depts = ['dept-emperor', 'dept-zhongshu', 'dept-hall', 'dept-menxia', 'dept-shangshu'];
+            depts.forEach(id => {
+                const el = document.getElementById(id);
+                // 清除發光效果與動畫
+                el.classList.remove('active-glow-blue', 'active-glow-green', 'active-glow-red', 'active-glow-orange', 'bg-yellow-100', 'border-yellow-600', 'shadow-xl', 'anim-pulse');
+                
+                // 精準重置透明度
+                if (id === 'dept-emperor') {
+                    el.classList.remove('opacity-40', 'opacity-20');
+                } else if (id === 'dept-hall' || id === 'dept-shangshu') {
+                    el.classList.add('opacity-20');
+                    el.classList.remove('opacity-40');
+                } else {
+                    el.classList.add('opacity-40');
+                    el.classList.remove('opacity-20');
+                }
+            });
+
+            // 恢復六部狀態
+            const boards = document.querySelectorAll('.board-item');
+            boards.forEach(b => {
+                b.classList.remove('bg-orange-500', 'border-orange-800', 'text-white', 'scale-110');
+                b.classList.add('bg-gray-100', 'border-gray-300', 'text-gray-400');
+            });
+
+            document.getElementById('log-content').innerHTML = "";
+            addLog("大唐政務系統準備就緒。");
+        }
+
+        // 初始化
+        window.onload = () => {
+            addLog("大唐政務系統準備就緒。");
+        }
+    </script>
+</body>
+</html>
