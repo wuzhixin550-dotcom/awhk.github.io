@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Javis 收支預算管家 (教學版)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <!-- 引入 Chart.js 以繪製圓餅圖 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+    body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0fdf4; }
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    }
+    .fade-in { animation: fadeIn 0.5s ease-in-out forwards; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 py-8 md:p-8 md:py-12">
+
+  <div class="glass-panel w-full max-w-3xl rounded-2xl overflow-hidden border border-emerald-100 shadow-2xl">
+    
+    <!-- 頂部 Javis 問候區 -->
+    <div class="bg-gradient-to-r from-emerald-600 to-teal-500 p-6 md:p-10 text-white text-center shadow-inner relative">
+      <div class="absolute top-4 right-4 bg-white/20 px-3 py-1 rounded-full text-xs md:text-sm backdrop-blur-sm border border-white/30">
+        理財第一課：預算分配
+      </div>
+      <div class="w-16 h-16 md:w-20 md:h-20 mx-auto bg-white rounded-full flex items-center justify-center mb-4 shadow-lg">
+        <i class="fas fa-chart-pie text-3xl md:text-4xl text-emerald-600"></i>
+      </div>
+      <h1 class="text-2xl md:text-3xl font-bold mb-2 tracking-wide">我的收支預算表</h1>
+      <p class="text-sm md:text-base text-emerald-100">Javis 助教與你一起學習量入為出</p>
+    </div>
+
+    <div class="p-6 md:p-10">
+      
+      <!-- Javis 提示語 -->
+      <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 md:p-5 rounded-r-lg text-sm md:text-base text-emerald-800 mb-8 flex items-start shadow-sm">
+        <i class="fas fa-robot text-xl md:text-2xl mr-3 mt-0.5 text-emerald-600"></i>
+        <div>
+          <p class="font-bold mb-1">同學你好！</p>
+          <p>請輸入你的預期收入，並將它分配到下方四個項目中。記得，每個項目最少都要分配 1 元喔！來試試看把「剩餘資金」完美分配完吧。</p>
+        </div>
+      </div>
+
+      <form id="budget-form" onsubmit="evaluateBudget(event)">
+        
+        <!-- 步驟一：預期收入 -->
+        <div class="mb-8 bg-slate-50 p-5 md:p-6 rounded-xl border border-slate-200">
+          <label class="block text-sm md:text-base font-bold text-slate-700 mb-3">
+            <i class="fas fa-hand-holding-usd text-amber-500 mr-2"></i>第一步：你有多少預期收入？
+          </label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500 font-bold md:text-lg">$</span>
+            <input type="number" id="income" required min="4" placeholder="請輸入總收入 (例如: 1000)" 
+                   class="w-full border-2 border-slate-200 rounded-lg pl-8 md:pl-10 pr-4 py-3 md:py-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-lg md:text-xl font-bold text-slate-700 transition"
+                   oninput="updateCalculation()">
+          </div>
+        </div>
+
+        <!-- 步驟二：預算分配 -->
+        <div class="mb-8">
+          <div class="flex justify-between items-end mb-4">
+            <label class="block text-sm md:text-base font-bold text-slate-700">
+              <i class="fas fa-coins text-emerald-500 mr-2"></i>第二步：分配你的資金
+            </label>
+            <div class="text-xs md:text-sm font-bold px-3 md:px-4 py-1.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200" id="remaining-badge">
+              剩餘可分配: <span id="remaining-amount" class="text-lg md:text-xl text-slate-800">$0</span>
+            </div>
+          </div>
+          
+          <!-- 在 iPad 上轉換為左右並排的兩行網格 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <!-- 必要開支 -->
+            <div class="flex items-center bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm focus-within:border-emerald-400 focus-within:ring-1 focus-within:ring-emerald-400 transition">
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 md:mr-4 flex-shrink-0 text-lg md:text-xl">
+                <i class="fas fa-file-invoice-dollar"></i>
+              </div>
+              <div class="flex-1">
+                <p class="text-xs md:text-sm font-bold text-slate-500">必要開支</p>
+                <p class="text-[10px] md:text-xs text-slate-400 hidden md:block mt-0.5">如吃飯、交通</p>
+              </div>
+              <div class="w-1/3 relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-2 text-slate-400">$</span>
+                <input type="number" id="needs" required min="1" value="1" oninput="updateCalculation()" class="w-full pl-6 pr-2 py-1.5 border-none focus:ring-0 text-right font-bold text-slate-700 md:text-lg bg-transparent">
+              </div>
+            </div>
+
+            <!-- 非必要開支 -->
+            <div class="flex items-center bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm focus-within:border-emerald-400 focus-within:ring-1 focus-within:ring-emerald-400 transition">
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mr-3 md:mr-4 flex-shrink-0 text-lg md:text-xl">
+                <i class="fas fa-shopping-bag"></i>
+              </div>
+              <div class="flex-1">
+                <p class="text-xs md:text-sm font-bold text-slate-500">非必要開支</p>
+                <p class="text-[10px] md:text-xs text-slate-400 hidden md:block mt-0.5">如娛樂、零食</p>
+              </div>
+              <div class="w-1/3 relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-2 text-slate-400">$</span>
+                <input type="number" id="wants" required min="1" value="1" oninput="updateCalculation()" class="w-full pl-6 pr-2 py-1.5 border-none focus:ring-0 text-right font-bold text-slate-700 md:text-lg bg-transparent">
+              </div>
+            </div>
+
+            <!-- 儲蓄 -->
+            <div class="flex items-center bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm focus-within:border-emerald-400 focus-within:ring-1 focus-within:ring-emerald-400 transition">
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mr-3 md:mr-4 flex-shrink-0 text-lg md:text-xl">
+                <i class="fas fa-piggy-bank"></i>
+              </div>
+              <div class="flex-1">
+                <p class="text-xs md:text-sm font-bold text-slate-500">儲蓄</p>
+                <p class="text-[10px] md:text-xs text-slate-400 hidden md:block mt-0.5">存起來為未來準備</p>
+              </div>
+              <div class="w-1/3 relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-2 text-slate-400">$</span>
+                <input type="number" id="savings" required min="1" value="1" oninput="updateCalculation()" class="w-full pl-6 pr-2 py-1.5 border-none focus:ring-0 text-right font-bold text-slate-700 md:text-lg bg-transparent">
+              </div>
+            </div>
+
+            <!-- 捐贈 -->
+            <div class="flex items-center bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm focus-within:border-emerald-400 focus-within:ring-1 focus-within:ring-emerald-400 transition">
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center mr-3 md:mr-4 flex-shrink-0 text-lg md:text-xl">
+                <i class="fas fa-hand-holding-heart"></i>
+              </div>
+              <div class="flex-1">
+                <p class="text-xs md:text-sm font-bold text-slate-500">捐贈</p>
+                <p class="text-[10px] md:text-xs text-slate-400 hidden md:block mt-0.5">幫助有需要的人</p>
+              </div>
+              <div class="w-1/3 relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-2 text-slate-400">$</span>
+                <input type="number" id="donations" required min="1" value="1" oninput="updateCalculation()" class="w-full pl-6 pr-2 py-1.5 border-none focus:ring-0 text-right font-bold text-slate-700 md:text-lg bg-transparent">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="submit-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 md:py-4 px-4 rounded-xl transition duration-200 shadow-md flex justify-center items-center text-lg md:text-xl mt-4 md:mt-8">
+          <i class="fas fa-magic mr-2"></i> 請 Javis 評估我的預算
+        </button>
+      </form>
+
+      <!-- 步驟三：評估結果 (預設隱藏) -->
+      <div id="evaluation-result" class="hidden mt-10 pt-8 border-t-2 border-slate-100 fade-in">
+        <h3 class="text-center text-xl md:text-2xl font-bold text-slate-800 mb-6">Javis 助教的預算診斷</h3>
+        
+        <!-- 大標題與圖示 -->
+        <div id="result-header" class="text-center mb-8">
+          <!-- 內容由 JS 動態生成 -->
+        </div>
+
+        <!-- 在 iPad 上，將圓餅圖與文字並排顯示 -->
+        <div class="md:flex md:items-start md:gap-8">
+          <!-- 圓餅圖容器 -->
+          <div class="w-full md:w-2/5 max-w-xs mx-auto mb-8 md:mb-0 flex-shrink-0">
+            <canvas id="budgetChart"></canvas>
+          </div>
+
+          <!-- 詳細評語條列 -->
+          <div class="w-full md:w-3/5 space-y-4" id="feedback-list">
+            <!-- 內容由 JS 動態生成 -->
+          </div>
+        </div>
+
+        <button onclick="resetForm()" class="mt-8 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 md:py-4 px-4 rounded-xl transition duration-200 border border-slate-300 md:text-lg">
+          <i class="fas fa-redo-alt mr-2"></i>重新分配
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // 儲存圖表實例
+    let budgetChartInstance = null;
+
+    // 即時計算剩餘金額
+    function updateCalculation() {
+      const income = parseInt(document.getElementById('income').value) || 0;
+      const needs = parseInt(document.getElementById('needs').value) || 0;
+      const wants = parseInt(document.getElementById('wants').value) || 0;
+      const savings = parseInt(document.getElementById('savings').value) || 0;
+      const donations = parseInt(document.getElementById('donations').value) || 0;
+
+      const totalAllocated = needs + wants + savings + donations;
+      const remaining = income - totalAllocated;
+
+      const remainingEl = document.getElementById('remaining-amount');
+      const badgeEl = document.getElementById('remaining-badge');
+
+      remainingEl.innerText = '$' + remaining.toLocaleString();
+
+      // 根據剩餘金額改變顏色，提示學生
+      if (remaining < 0) {
+        badgeEl.className = "text-xs font-bold px-3 py-1 rounded-full bg-rose-100 text-rose-700 border border-rose-200 transition";
+        remainingEl.className = "text-lg text-rose-700";
+      } else if (remaining === 0 && income > 0) {
+        badgeEl.className = "text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 transition";
+        remainingEl.className = "text-lg text-emerald-700";
+      } else {
+        badgeEl.className = "text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 transition";
+        remainingEl.className = "text-lg text-slate-800";
+      }
+    }
+
+    // 提交並評估預算
+    function evaluateBudget(e) {
+      e.preventDefault();
+
+      const income = parseInt(document.getElementById('income').value) || 0;
+      const needs = parseInt(document.getElementById('needs').value) || 0;
+      const wants = parseInt(document.getElementById('wants').value) || 0;
+      const savings = parseInt(document.getElementById('savings').value) || 0;
+      const donations = parseInt(document.getElementById('donations').value) || 0;
+
+      // 再次檢查是否有小於 1 的防呆機制 (雖然 HTML 有 min="1"，但為保險起見)
+      if (needs < 1 || wants < 1 || savings < 1 || donations < 1) {
+        alert("同學，每一個分配項目最少都要大於等於 1 元喔！");
+        return;
+      }
+
+      const totalAllocated = needs + wants + savings + donations;
+      const remaining = income - totalAllocated;
+
+      // 準備顯示結果的區塊
+      const resultDiv = document.getElementById('evaluation-result');
+      const headerDiv = document.getElementById('result-header');
+      const feedbackListDiv = document.getElementById('feedback-list');
+      
+      resultDiv.classList.remove('hidden');
+      feedbackListDiv.innerHTML = ''; // 清空舊的評語
+
+      // 狀況一：透支 (分配大於收入)
+      if (remaining < 0) {
+        headerDiv.innerHTML = `
+          <div class="w-16 h-16 mx-auto bg-rose-100 rounded-full flex items-center justify-center mb-3 text-rose-500 text-3xl">
+            <i class="fas fa-exclamation-triangle"></i>
+          </div>
+          <h4 class="text-lg font-bold text-rose-600">哎呀！預算透支了</h4>
+          <p class="text-sm text-slate-500 mt-1">你分配的錢比賺的錢還要多 <span class="font-bold text-rose-500">$${Math.abs(remaining)}</span> 元</p>
+        `;
+        
+        addFeedbackItem('rose', 'fa-times-circle', '入不敷出', '理財的第一步是「量入為出」。請重新調整你的分配，特別是看看「非必要開支」是不是可以減少一些呢？');
+        
+        // 隱藏提交按鈕，避免畫面太長
+        document.getElementById('submit-btn').style.display = 'none';
+        return; 
+      }
+
+      // 狀況二：有剩餘未分配
+      if (remaining > 0) {
+        headerDiv.innerHTML = `
+          <div class="w-16 h-16 mx-auto bg-amber-100 rounded-full flex items-center justify-center mb-3 text-amber-500 text-3xl">
+            <i class="fas fa-search-dollar"></i>
+          </div>
+          <h4 class="text-lg font-bold text-amber-600">資金尚未分配完畢</h4>
+          <p class="text-sm text-slate-500 mt-1">你還有 <span class="font-bold text-amber-600">$${remaining}</span> 元沒有規劃到喔！</p>
+        `;
+        addFeedbackItem('amber', 'fa-lightbulb', '讓每一塊錢都有工作', '好的預算規劃會把每一塊錢都分配好（這叫零基預算）。建議你可以把剩下的錢加到「儲蓄」或是「捐贈」裡面！');
+      } 
+      // 狀況三：完美分配完畢
+      else {
+        headerDiv.innerHTML = `
+          <div class="w-16 h-16 mx-auto bg-emerald-100 rounded-full flex items-center justify-center mb-3 text-emerald-500 text-3xl">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <h4 class="text-lg font-bold text-emerald-600">完美分配！</h4>
+          <p class="text-sm text-slate-500 mt-1">你成功將所有收入規劃完畢，非常好！</p>
+        `;
+      }
+
+      // 進行比例分析與給予評語 (無論是否有剩餘，都對已分配的進行評估)
+      
+      // 1. 儲蓄評估
+      const savingsRatio = savings / income;
+      if (savingsRatio >= 0.2) {
+        addFeedbackItem('blue', 'fa-piggy-bank', '儲蓄達人', `你將收入的 ${Math.round(savingsRatio*100)}% 存了起來！這能為你的未來打下非常堅實的基礎，超棒的習慣！`);
+      } else if (savingsRatio < 0.1) {
+        addFeedbackItem('slate', 'fa-seedling', '未雨綢繆', `目前的儲蓄比例（${Math.round(savingsRatio*100)}%）稍微偏低。建議未來可以試著將儲蓄比例提高到 10%~20%，以應付突發狀況喔。`);
+      } else {
+        addFeedbackItem('blue', 'fa-thumbs-up', '穩健儲蓄', `你保持了不錯的儲蓄習慣，繼續維持下去！`);
+      }
+
+      // 2. 想要 vs 需要 (非必要開支 > 必要開支)
+      if (wants > needs) {
+        addFeedbackItem('rose', 'fa-shopping-cart', '享樂主義？', '注意囉！你的「非必要開支」大於「必要開支」了。雖然享受生活很重要，但要小心分辨「想要」和「需要」，別不小心花光了錢喔！');
+      }
+
+      // 3. 捐贈評估 (只要大於等於1，給予鼓勵)
+      if (donations > 0) {
+        const donationRatio = (donations / income * 100).toFixed(1);
+        addFeedbackItem('purple', 'fa-heart', '愛心天使', `你規劃了 ${donationRatio}% 的資金用於捐贈。懂得分享的人心靈最富有，Javis 為你的善心點大大的讚！`);
+      }
+
+      // 繪製圓餅圖
+      const ctx = document.getElementById('budgetChart').getContext('2d');
+      if (budgetChartInstance) {
+        budgetChartInstance.destroy(); // 清除舊圖表
+      }
+      budgetChartInstance = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: ['必要開支', '非必要開支', '儲蓄', '捐贈'],
+          datasets: [{
+            data: [needs, wants, savings, donations],
+            backgroundColor: [
+              '#3b82f6', // blue-500
+              '#f43f5e', // rose-500
+              '#f59e0b', // amber-500
+              '#a855f7'  // purple-500
+            ],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                font: {
+                  family: "'Noto Sans TC', sans-serif"
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 隱藏提交按鈕
+      document.getElementById('submit-btn').style.display = 'none';
+      
+      // 捲動到結果區
+      resultDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // 輔助函數：新增一條評語
+    function addFeedbackItem(colorClass, iconClass, title, desc) {
+      const list = document.getElementById('feedback-list');
+      
+      // 對應 Tailwind 的顏色設定
+      let bgClass, textClass, borderClass;
+      if(colorClass === 'rose') { bgClass = 'bg-rose-50'; textClass = 'text-rose-600'; borderClass = 'border-rose-200'; }
+      else if(colorClass === 'amber') { bgClass = 'bg-amber-50'; textClass = 'text-amber-600'; borderClass = 'border-amber-200'; }
+      else if(colorClass === 'blue') { bgClass = 'bg-blue-50'; textClass = 'text-blue-600'; borderClass = 'border-blue-200'; }
+      else if(colorClass === 'purple') { bgClass = 'bg-purple-50'; textClass = 'text-purple-600'; borderClass = 'border-purple-200'; }
+      else if(colorClass === 'slate') { bgClass = 'bg-slate-50'; textClass = 'text-slate-600'; borderClass = 'border-slate-200'; }
+      else { bgClass = 'bg-emerald-50'; textClass = 'text-emerald-600'; borderClass = 'border-emerald-200'; }
+
+      const item = document.createElement('div');
+      item.className = `p-4 rounded-xl border ${borderClass} ${bgClass} flex items-start`;
+      item.innerHTML = `
+        <div class="${textClass} text-xl mr-3 mt-1 w-6 text-center">
+          <i class="fas ${iconClass}"></i>
+        </div>
+        <div>
+          <h5 class="font-bold text-slate-800 text-sm mb-1">${title}</h5>
+          <p class="text-xs text-slate-600 leading-relaxed">${desc}</p>
+        </div>
+      `;
+      list.appendChild(item);
+    }
+
+    // 重新開始
+    function resetForm() {
+      // 顯示提交按鈕
+      document.getElementById('submit-btn').style.display = 'flex';
+      // 隱藏結果區塊
+      document.getElementById('evaluation-result').classList.add('hidden');
+      
+      // 重置欄位數值 (除了收入清空，四個分配項目預設回到 1)
+      document.getElementById('income').value = '';
+      document.getElementById('needs').value = '1';
+      document.getElementById('wants').value = '1';
+      document.getElementById('savings').value = '1';
+      document.getElementById('donations').value = '1';
+      
+      updateCalculation();
+      
+      // 捲動回最上方
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 初始化計算
+    window.onload = updateCalculation;
+  </script>
+</body>
+</html>
